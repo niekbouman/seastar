@@ -382,3 +382,24 @@ SEASTAR_TEST_CASE(test_batch_generator_convertible) {
         BOOST_REQUIRE_EQUAL(*n, expected_n++);
     }
 }
+
+coroutine::experimental::generator<int>
+bidirectional_generator() {
+    int num = 0;
+    for (;;) {
+        num = co_yield num+1;
+    }
+}
+
+SEASTAR_TEST_CASE(test_generator_input) {
+
+    auto numbers = bidirectional_generator();
+    auto n = co_await numbers.begin();
+
+    std::cout << *n << ' '; // will print 1
+
+    numbers.send(42);
+    co_await ++n;
+
+    std::cout << *n << ' '; // will print 43
+}

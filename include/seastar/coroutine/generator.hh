@@ -78,7 +78,8 @@ protected:
     // pointer to the denoted object in the promise as long as the result of
     // dereferencing this pointer is convertible to the Ref type.
     std::add_pointer_t<Yielded> _value = nullptr;
-
+public:
+    int input_value;
 protected:
     std::exception_ptr _exception;
     std::coroutine_handle<> _consumer;
@@ -107,11 +108,14 @@ protected:
     class yield_awaiter final {
         generator_promise_base* _promise;
         std::coroutine_handle<> _consumer;
+        int& _ret;
+
     public:
         yield_awaiter(generator_promise_base* promise,
-                      std::coroutine_handle<> consumer) noexcept
+                      std::coroutine_handle<> consumer, int& ret) noexcept
             : _promise{promise}
             , _consumer{consumer}
+            , _ret{ret}
         {}
         bool await_ready() const noexcept {
             return false;
@@ -127,7 +131,7 @@ protected:
             }
             return _consumer;
         }
-        void await_resume() noexcept {}
+        int& await_resume() noexcept { return _ret; }
     };
 
     class copy_awaiter {
@@ -177,7 +181,7 @@ public:
 
     yield_awaiter final_suspend() noexcept {
         _value = nullptr;
-        return yield_awaiter{this, this->_consumer};
+        return yield_awaiter{this, this->_consumer, this->input_value};
     }
 
     void unhandled_exception() noexcept {
@@ -186,7 +190,7 @@ public:
 
     yield_awaiter yield_value(Yielded value) noexcept {
         this->_value = std::addressof(value);
-        return yield_awaiter{this, this->_consumer};
+        return yield_awaiter{this, this->_consumer, this->input_value};
     }
 
     copy_awaiter yield_value(const std::remove_reference_t<Yielded>& value)
@@ -417,6 +421,16 @@ public:
 
     [[nodiscard]] std::default_sentinel_t end() const noexcept {
         return {};
+    }
+
+    void send(value_type const& input)
+    {
+        _coro.promise().input_value = input;
+    }
+
+    void send(value_type&& input)
+    {
+        _coro.promise().input_value = std::move(input);
     }
 };
 
